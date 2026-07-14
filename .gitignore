@@ -1,0 +1,57 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Environments
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code / IDE files
+.vscode/
+.idea/
+
+# Output and data
+output_ml_new/
+data/
+datasets/
+models/
+*.xlsx
+*.csv
+
+# Logs, caches, and temporary files
+*.log
+.pytest_cache/
+.mypy_cache/
+.cache/
+*.pickle
+*.pkl
+
+# ML model files
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Optional: local credentials
+credentials.json

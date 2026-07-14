@@ -1,0 +1,42 @@
+# Abaikan folder Git (ini wajib agar image lebih ringan)
+.git
+.gitignore
+
+# Abaikan Virtual Environment (Docker akan menginstall sendiri lewat requirements.txt)
+venv/
+.venv/
+env/
+ENV/
+
+# Abaikan Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Abaikan file konfigurasi editor
+.vscode/
+.idea/
+.ipynb_checkpoints/
+
+# Abaikan file sistem Mac & Windows
+.DS_Store
+Thumbs.db
+
+# ML model files
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# Abaikan file data mentah yang sangat besar (sesuai folder Anda)
+data/
+datasets/
+output_ml_new/
+*.xlsx
+*.csv
+
+# Abaikan file rahasia/kredensial lokal
+.env
+credentials.json
