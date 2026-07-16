@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loss Payload Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0A0E13;
+    --panel: #12181F;
+    --panel-raised: #171F28;
+    --border: #232B36;
+    --border-soft: #1A212B;
+    --text: #E7ECF2;
+    --text-dim: #7C8896;
+    --text-faint: #4A5563;
+    --cyan: #4FD1E8;
+    --sev-low: #35D07F;
+    --sev-minor: #F0C24B;
+    --sev-major: #FF9142;
+    --sev-critical: #FF5A5A;
+    --accent: var(--sev-low);
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(79,209,232,0.05), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(53,208,127,0.04), transparent 45%);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    transition: --accent 0.4s ease;
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+
+  .brand-mark{
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .brand-mark svg{ width:100%; height:100%; }
+  .brand-mark .bar{ transition: fill 0.4s ease; }
+
+  .brand-text{
+    font-family: var(--font-display);
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.02em;
+  }
+  .brand-text small{
+    display:block;
+    font-family: var(--font-mono);
+    font-weight:400;
+    font-size:10px;
+    letter-spacing:0.12em;
+    color: var(--text-faint);
+    margin-top:1px;
+  }
+
+  .status-pill{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--text-dim);
+    padding:6px 12px;
+    border:1px solid var(--border);
+    border-radius:20px;
+  }
+  .status-dot{
+    width:6px; height:6px; border-radius:50%;
+    background: var(--sev-low);
+    box-shadow: 0 0 6px var(--sev-low);
+  }
+
+  .shell{
+    display:grid;
+    grid-template-columns: minmax(360px, 560px) 1fr;
+    gap:1px;
+    background: var(--border-soft);
+    max-width:1240px;
+    margin:0 auto;
+    min-height: calc(100vh - 66px);
+  }
+
+  @media (max-width: 860px){
+    .shell{ grid-template-columns: 1fr; }
+  }
+
+  .panel{ background: var(--panel); padding: 32px 28px 40px; }
+
+  .panel-label{
+    font-family: var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    color: var(--text-faint);
+    text-transform:uppercase;
+    margin-bottom: 22px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel-label::after{
+    content:'';
+    height:1px;
+    flex:1;
+    background: var(--border);
+  }
+
+  /* Severity segmented control */
+  .severity-control{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:8px;
+    margin-bottom:26px;
+  }
+  .sev-btn{
+    position:relative;
+    border:1px solid var(--border);
+    background: var(--panel-raised);
+    border-radius:8px;
+    padding:11px 6px 9px;
+    cursor:pointer;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--text-dim);
+    text-align:center;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    transition: all 0.15s ease;
+  }
+  .sev-btn .dot{
+    width:7px;height:7px;border-radius:50%;
+    margin:0 auto 7px;
+    background: var(--text-faint);
+    transition: all 0.15s ease;
+  }
+  .sev-btn[data-sev="low"] .dot{ background: var(--sev-low); }
+  .sev-btn[data-sev="minor"] .dot{ background: var(--sev-minor); }
+  .sev-btn[data-sev="major"] .dot{ background: var(--sev-major); }
+  .sev-btn[data-sev="critical"] .dot{ background: var(--sev-critical); }
+
+  .sev-btn.active[data-sev="low"]{ border-color: var(--sev-low); background: rgba(53,208,127,0.08); color: var(--sev-low); }
+  .sev-btn.active[data-sev="minor"]{ border-color: var(--sev-minor); background: rgba(240,194,75,0.08); color: var(--sev-minor); }
+  .sev-btn.active[data-sev="major"]{ border-color: var(--sev-major); background: rgba(255,145,66,0.08); color: var(--sev-major); }
+  .sev-btn.active[data-sev="critical"]{ border-color: var(--sev-critical); background: rgba(255,90,90,0.08); color: var(--sev-critical); }
+  .sev-btn.active .dot{ box-shadow: 0 0 8px currentColor; }
+
+  .field-row{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    color: var(--text-dim);
+    margin-bottom:6px;
+    font-weight:500;
+  }
+  .field .hint{
+    font-family: var(--font-mono);
+    font-size:10px;
+    color: var(--text-faint);
+    margin-top:5px;
+  }
+
+  input[type=text], input[type=number], select, textarea{
+    width:100%;
+    background: var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:10px 12px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:13px;
+    outline:none;
+    transition: border-color 0.15s ease;
+  }
+  textarea{
+    resize:vertical;
+    min-height:78px;
+    line-height:1.5;
+  }
+  input::placeholder, textarea::placeholder{ color: var(--text-faint); }
+  input:focus, select:focus, textarea:focus{
+    border-color: var(--accent);
+  }
+  select{ appearance:none; cursor:pointer; }
+
+  .json-fill-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-top:8px;
+  }
+  .fill-btn{
+    padding:8px 16px;
+    border-radius:7px;
+    border:1px solid var(--border);
+    background: var(--panel-raised);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .fill-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .json-fill-msg{
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--text-faint);
+  }
+  .json-fill-msg.error{ color: var(--sev-critical); }
+  .json-fill-msg.success{ color: var(--sev-low); }
+
+  .run-btn{
+    width:100%;
+    margin-top:10px;
+    padding:14px;
+    border-radius:8px;
+    border:none;
+    background: var(--accent);
+    color:#08110D;
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition: filter 0.15s ease, background 0.4s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+  }
+  .run-btn:hover{ filter: brightness(1.08); }
+  .run-btn:active{ filter: brightness(0.94); }
+  .run-btn:disabled{ opacity:0.55; cursor:progress; }
+
+  /* Result panel */
+  .result-panel{
+    display:flex;
+    flex-direction:column;
+    background: var(--panel);
+    position:relative;
+  }
+  .result-inner{
+    padding: 32px 28px 40px;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .empty-state{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color: var(--text-faint);
+    gap:14px;
+    padding: 30px 20px;
+  }
+  .empty-state svg{ opacity:0.5; }
+  .empty-state p{
+    font-size:13px;
+    max-width:260px;
+    line-height:1.6;
+    margin:0;
+  }
+
+  .result-card{ display:none; flex:1; flex-direction:column; }
+  .result-card.show{ display:flex; }
+
+  .result-headline{
+    text-align:center;
+    padding: 28px 10px 24px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background: var(--panel-raised);
+    margin-bottom:20px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .result-headline .eyebrow{
+    font-family: var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.14em;
+    color: var(--text-faint);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .result-headline .value{
+    font-family: var(--font-display);
+    font-size:52px;
+    font-weight:700;
+    line-height:1;
+    color: var(--text);
+  }
+  .result-headline .unit{
+    font-family: var(--font-mono);
+    font-size:14px;
+    color: var(--text-dim);
+    margin-left:6px;
+  }
+  .result-headline .sev-tag{
+    display:inline-block;
+    margin-top:14px;
+    padding:4px 12px;
+    border-radius:20px;
+    font-family: var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    border:1px solid currentColor;
+  }
+
+  .breakdown{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:1px;
+    background: var(--border-soft);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .breakdown-item{
+    background: var(--panel);
+    padding:13px 14px;
+  }
+  .breakdown-item .k{
+    font-size:10px;
+    color: var(--text-faint);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-bottom:5px;
+  }
+  .breakdown-item .v{
+    font-family: var(--font-mono);
+    font-size:13px;
+    color: var(--text);
+  }
+
+  .error-card{
+    display:none;
+    padding:18px 18px;
+    border-radius:10px;
+    border:1px solid rgba(255,90,90,0.35);
+    background: rgba(255,90,90,0.06);
+    margin-bottom:20px;
+  }
+  .error-card.show{ display:block; }
+  .error-card .k{
+    font-family: var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color: var(--sev-critical);
+    margin-bottom:8px;
+  }
+  .error-card .msg{
+    font-size:13px;
+    color: var(--text);
+    line-height:1.55;
+  }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 30 30" fill="none">
+        <rect class="bar" x="2" y="18" width="4" height="10" rx="1" fill="var(--accent)"/>
+        <rect class="bar" x="9" y="12" width="4" height="16" rx="1" fill="var(--accent)" opacity="0.75"/>
+        <rect class="bar" x="16" y="6" width="4" height="22" rx="1" fill="var(--accent)" opacity="0.55"/>
+        <rect class="bar" x="23" y="0" width="4" height="28" rx="1" fill="var(--accent)" opacity="0.35"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      Loss Payload Predictor
+      <small>NETWORK INCIDENT ANALYSIS</small>
+    </div>
+  </div>
+  <div class="status-pill"><span class="status-dot" id="apiStatusDot"></span><span id="apiStatusText">checking api…</span></div>
+</div>
+
+<div class="shell">
+
+  <!-- FORM -->
+  <form class="panel" id="predictForm">
+
+    <div class="panel-label">Quick fill (paste JSON)</div>
+    <div class="field">
+      <textarea id="jsonInput" placeholder='{"site_id": "SBS087", "severity": "Low", "alarm_start_time": "2026-04-29 23:57:36", ...}'></textarea>
+      <div class="json-fill-row">
+        <button type="button" class="fill-btn" id="fillFromJsonBtn">Isi ke form</button>
+        <span class="json-fill-msg" id="jsonFillMsg"></span>
+      </div>
+    </div>
+
+    <div class="panel-label" style="margin-top:28px;">Incident input</div>
+
+    <div class="field">
+      <label>Severity</label>
+      <div class="severity-control" id="severityControl">
+        <div class="sev-btn active" data-sev="low"><div class="dot"></div>Low</div>
+        <div class="sev-btn" data-sev="minor"><div class="dot"></div>Minor</div>
+        <div class="sev-btn" data-sev="major"><div class="dot"></div>Major</div>
+        <div class="sev-btn" data-sev="critical"><div class="dot"></div>Critical</div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Site ID</label>
+        <input type="text" id="site_id" placeholder="SBS087" required>
+      </div>
+      <div class="field">
+        <label>Regional</label>
+        <input type="text" id="regional" placeholder="KALIMANTAN" required>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Alarm start time</label>
+        <input type="text" id="alarm_start_time" placeholder="2026-04-29 23:57:36" required>
+        <div class="hint">format YYYY-MM-DD HH:MM:SS atau DD/MM/YYYY HH.MM.SS</div>
+      </div>
+      <div class="field">
+        <label>Duration</label>
+        <input type="text" id="duarasi_alaram" placeholder="14:36:59" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]" required>
+        <div class="hint">format HH:MM:SS</div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Payload (GB)</label>
+        <input type="text" id="payload" placeholder="0" required>
+      </div>
+      <div class="field">
+        <label>Baseline payload (GB)</label>
+        <input type="text" id="baseline_payload" placeholder="9750,617441" required>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>RPMB</label>
+        <input type="text" id="rpmb" placeholder="3,259676896" required>
+      </div>
+      <div class="field">
+        <label>Availability (%)</label>
+        <input type="text" id="availability_full" placeholder="62,53472222" required>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Day type</label>
+        <select id="day_type">
+          <option value="Weekday">Weekday</option>
+          <option value="Weekend">Weekend</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Update impact</label>
+        <input type="text" id="update_impact" value="1">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Root cause category</label>
+        <input type="text" id="rootcausecategory" placeholder="Power">
+      </div>
+      <div class="field">
+        <label>Impacted sites (URL)</label>
+        <input type="text" id="url" placeholder="SBS087">
+      </div>
+    </div>
+
+    <button type="submit" class="run-btn" id="runBtn">
+      Run prediction
+    </button>
+  </form>
+
+  <!-- RESULT -->
+  <div class="result-panel">
+    <div class="result-inner">
+
+      <div class="panel-label">Prediction result</div>
+
+      <div class="error-card" id="errorCard">
+        <div class="k">Request rejected</div>
+        <div class="msg" id="errorMsg"></div>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+          <path d="M3 12h4l2 8 4-16 2 8h6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Isi data insiden di sebelah kiri, lalu jalankan prediksi untuk melihat estimasi loss payload.</p>
+      </div>
+
+      <div class="result-card" id="resultCard">
+        <div class="result-headline" id="resultHeadline">
+          <div class="eyebrow">Predicted loss payload</div>
+          <div><span class="value" id="resultValue">0</span><span class="unit">GB</span></div>
+          <div class="sev-tag" id="resultSevTag">severity</div>
+        </div>
+
+        <div class="breakdown" id="resultBreakdown"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SEV_COLORS = {
+  low: '#35D07F',
+  minor: '#F0C24B',
+  major: '#FF9142',
+  critical: '#FF5A5A',
+};
+
+let currentSeverity = 'low';
+
+function applyAccent(sev){
+  document.documentElement.style.setProperty('--accent', SEV_COLORS[sev]);
+}
+
+document.querySelectorAll('.sev-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSeverity = btn.dataset.sev;
+    applyAccent(currentSeverity);
+  });
+});
+applyAccent(currentSeverity);
+
+async function checkHealth(){
+  const dot = document.getElementById('apiStatusDot');
+  const text = document.getElementById('apiStatusText');
+  try{
+    const res = await fetch('/health');
+    if(res.ok){
+      text.textContent = 'api online';
+      dot.style.background = '#35D07F';
+      dot.style.boxShadow = '0 0 6px #35D07F';
+    } else { throw new Error(); }
+  }catch(e){
+    text.textContent = 'api unreachable';
+    dot.style.background = '#FF5A5A';
+    dot.style.boxShadow = '0 0 6px #FF5A5A';
+  }
+}
+checkHealth();
+
+// -- Quick fill dari JSON --
+const TEXT_FIELD_IDS = [
+  'site_id', 'alarm_start_time', 'duarasi_alaram', 'payload',
+  'baseline_payload', 'rpmb', 'availability_full', 'regional',
+  'rootcausecategory', 'update_impact', 'url',
+];
+
+function sanitizeJsonInput(raw){
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if(start === -1 || end === -1 || end < start){
+    return raw; // biarkan JSON.parse yang lempar error aslinya
+  }
+  let inner = raw.slice(start, end + 1);
+  // buang trailing comma sebelum '}' atau ']' (valid di Python dict, tidak valid di JSON.parse)
+  inner = inner.replace(/,(\s*[}\]])/g, '$1');
+  return inner;
+}
+
+document.getElementById('fillFromJsonBtn').addEventListener('click', () => {
+  const msg = document.getElementById('jsonFillMsg');
+  msg.classList.remove('error', 'success');
+
+  let data;
+  try{
+    const cleaned = sanitizeJsonInput(document.getElementById('jsonInput').value);
+    data = JSON.parse(cleaned);
+  }catch(e){
+    msg.textContent = 'JSON tidak valid — cek format tanda kutip/koma.';
+    msg.classList.add('error');
+    return;
+  }
+
+  TEXT_FIELD_IDS.forEach(id => {
+    if(data[id] !== undefined && data[id] !== null){
+      document.getElementById(id).value = data[id];
+    }
+  });
+
+  if(data.severity){
+    const sevKey = String(data.severity).toLowerCase();
+    const btn = document.querySelector(`.sev-btn[data-sev="${sevKey}"]`);
+    if(btn){
+      document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSeverity = sevKey;
+      applyAccent(currentSeverity);
+    }
+  }
+
+  if(data.day_type){
+    const select = document.getElementById('day_type');
+    const match = [...select.options].find(o => o.value.toLowerCase() === String(data.day_type).toLowerCase());
+    if(match) select.value = match.value;
+  }
+
+  msg.textContent = 'Form terisi dari JSON.';
+  msg.classList.add('success');
+});
+
+document.getElementById('predictForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const runBtn = document.getElementById('runBtn');
+  const errorCard = document.getElementById('errorCard');
+  const emptyState = document.getElementById('emptyState');
+  const resultCard = document.getElementById('resultCard');
+
+  errorCard.classList.remove('show');
+  resultCard.classList.remove('show');
+  emptyState.style.display = 'none';
+
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running…';
+
+  const payload = {
+    site_id: document.getElementById('site_id').value,
+    severity: currentSeverity,
+    alarm_start_time: document.getElementById('alarm_start_time').value,
+    duarasi_alaram: document.getElementById('duarasi_alaram').value,
+    payload: document.getElementById('payload').value,
+    baseline_payload: document.getElementById('baseline_payload').value,
+    rpmb: document.getElementById('rpmb').value,
+    availability_full: document.getElementById('availability_full').value,
+    regional: document.getElementById('regional').value,
+    day_type: document.getElementById('day_type').value,
+    rootcausecategory: document.getElementById('rootcausecategory').value || 'unknown',
+    update_impact: document.getElementById('update_impact').value || '1',
+    url: document.getElementById('url').value,
+  };
+
+  try{
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if(!res.ok){
+      throw new Error(data.detail || 'Request gagal diproses.');
+    }
+
+    const value = data.predicted_loss_payload;
+    document.getElementById('resultValue').textContent = value.toLocaleString('id-ID');
+
+    const sevTag = document.getElementById('resultSevTag');
+    sevTag.textContent = currentSeverity;
+    sevTag.style.color = SEV_COLORS[currentSeverity];
+
+    const headline = document.getElementById('resultHeadline');
+    headline.style.borderColor = SEV_COLORS[currentSeverity];
+    headline.style.boxShadow = `0 0 24px -8px ${SEV_COLORS[currentSeverity]}`;
+
+    document.getElementById('resultBreakdown').innerHTML = `
+      <div class="breakdown-item"><div class="k">Site</div><div class="v">${payload.site_id}</div></div>
+      <div class="breakdown-item"><div class="k">Regional</div><div class="v">${payload.regional}</div></div>
+      <div class="breakdown-item"><div class="k">Duration</div><div class="v">${payload.duarasi_alaram}</div></div>
+      <div class="breakdown-item"><div class="k">Day type</div><div class="v">${payload.day_type}</div></div>
+      <div class="breakdown-item"><div class="k">Baseline payload</div><div class="v">${payload.baseline_payload} GB</div></div>
+      <div class="breakdown-item"><div class="k">Current payload</div><div class="v">${payload.payload} GB</div></div>
+    `;
+
+    resultCard.classList.add('show');
+  }catch(err){
+    document.getElementById('errorMsg').textContent = err.message;
+    errorCard.classList.add('show');
+    emptyState.style.display = 'flex';
+  }finally{
+    runBtn.disabled = false;
+    runBtn.textContent = 'Run prediction';
+  }
+});
+</script>
+
+</body>
+</html>

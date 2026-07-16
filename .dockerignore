@@ -2,7 +2,7 @@
 .git
 .gitignore
 
-# Abaikan Virtual Environment (Docker akan menginstall sendiri lewat requirements.txt)
+# Abaikan Virtual Environment
 venv/
 .venv/
 env/
@@ -23,19 +23,20 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# ML model files
+# ML model files yang TIDAK dipakai (checkpoint training, bukan artifact final)
 *.h5
 *.hdf5
 *.pt
 *.pth
 *.ckpt
 
-# Abaikan file data mentah yang sangat besar (sesuai folder Anda)
-data/
-datasets/
-output_ml_new/
+# Abaikan raw data training yang tidak dibutuhkan API (notebook, excel mentah)
+*.ipynb
 *.xlsx
+
+# Abaikan semua csv secara default, TAPI izinkan file yang dibutuhkan runtime API
 *.csv
+!baseline_payload_hourly_weekly.csv
 
 # Abaikan file rahasia/kredensial lokal
 .env
