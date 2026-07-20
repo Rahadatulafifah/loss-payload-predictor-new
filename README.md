@@ -74,7 +74,6 @@ pip install -r requirements.txt
 5. Output tersimpan otomatis di folder `output_ml_new`, termasuk `best_incident_model.joblib` yang dipakai API.
 
 Catatan: sel hyperparameter tuning (RandomizedSearchCV) adalah bagian paling lama, bisa beberapa menit tergantung spesifikasi laptop.
-
 ## Prediksi Data Baru (dari Notebook)
 
 Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi variabel `raw_input` dengan data insiden baru lalu jalankan selnya. Field yang dibutuhkan: `site_id`, `severity`, `alarm_start_time`, `duarasi_alaram`, `payload`, `baseline_payload`, `rpmb`, `availability_full`, `regional`, `day_type`, `rootcausecategory`, `update_impact`, `url`.
@@ -99,7 +98,7 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 | rootcausedetail | Sudah diwakili `rootcausecategory` |
 | url (mentah) | Sudah diekstrak menjadi `impacted_sites_count` |
 
-## Fitur yang Digunakan Model (20 fitur)
+## Fitur yang Digunakan Model (19 fitur)
 
 | Fitur | Sumber | Keterangan |
 |---|---|---|
@@ -115,7 +114,6 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 | month | Diturunkan | Bulan mulai alarm |
 | is_peak_hour | Dibuat | 1 jika jam 08.00–22.00 |
 | regional | Dataset | Label encoded |
-| site_id | Dataset | Label encoded |
 | day_type | Dataset | Weekday/Weekend, label encoded |
 | rootcausecategory | Dataset | Label encoded |
 | log_baseline_payload | Dibuat | log1p(baseline_payload) |
