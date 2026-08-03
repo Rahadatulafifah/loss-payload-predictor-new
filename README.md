@@ -226,7 +226,7 @@ Response:
 
 ```json
 {
-  "predicted_loss_payload": 1162.7
+  "predicted_loss_payload": 994.25
 }
 ```
 
