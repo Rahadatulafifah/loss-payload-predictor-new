@@ -469,27 +469,20 @@
 
     <div class="field-row">
       <div class="field">
-        <label>Payload (GB)</label>
+        <label>Payload (MB)</label>
         <input type="text" id="payload" placeholder="0" required>
       </div>
       <div class="field">
-        <label>Baseline payload (GB)</label>
+        <label>Baseline payload (MB)</label>
         <input type="text" id="baseline_payload" placeholder="9750,617441" required>
       </div>
     </div>
 
     <div class="field-row">
       <div class="field">
-        <label>RPMB</label>
-        <input type="text" id="rpmb" placeholder="3,259676896" required>
-      </div>
-      <div class="field">
         <label>Availability (%)</label>
         <input type="text" id="availability_full" placeholder="62,53472222" required>
       </div>
-    </div>
-
-    <div class="field-row">
       <div class="field">
         <label>Day type</label>
         <select id="day_type">
@@ -497,20 +490,16 @@
           <option value="Weekend">Weekend</option>
         </select>
       </div>
-      <div class="field">
-        <label>Update impact</label>
-        <input type="text" id="update_impact" value="1">
-      </div>
     </div>
 
     <div class="field-row">
       <div class="field">
-        <label>Root cause category</label>
-        <input type="text" id="rootcausecategory" placeholder="Power">
+        <label>Update impact</label>
+        <input type="text" id="update_impact" value="1">
       </div>
       <div class="field">
-        <label>Impacted sites (URL)</label>
-        <input type="text" id="url" placeholder="SBS087">
+        <label>Root cause category</label>
+        <input type="text" id="rootcausecategory" placeholder="Power">
       </div>
     </div>
 
@@ -540,7 +529,7 @@
       <div class="result-card" id="resultCard">
         <div class="result-headline" id="resultHeadline">
           <div class="eyebrow">Predicted loss payload</div>
-          <div><span class="value" id="resultValue">0</span><span class="unit">GB</span></div>
+          <div><span class="value" id="resultValue">0</span><span class="unit">MB</span></div>
           <div class="sev-tag" id="resultSevTag">severity</div>
         </div>
 
@@ -595,10 +584,14 @@ async function checkHealth(){
 checkHealth();
 
 // -- Quick fill dari JSON --
+// Catatan revisi: "rpmb" dan "url" DIHAPUS dari daftar field yang diisi
+// otomatis, karena keduanya sudah tidak dipakai sebagai fitur model di
+// pipeline terbaru (rpmb dihapus total, url hanya dipakai untuk audit
+// impacted_sites_count di notebook, bukan input /predict).
 const TEXT_FIELD_IDS = [
   'site_id', 'alarm_start_time', 'duarasi_alaram', 'payload',
-  'baseline_payload', 'rpmb', 'availability_full', 'regional',
-  'rootcausecategory', 'update_impact', 'url',
+  'baseline_payload', 'availability_full', 'regional',
+  'rootcausecategory', 'update_impact',
 ];
 
 function sanitizeJsonInput(raw){
@@ -669,6 +662,8 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
   runBtn.disabled = true;
   runBtn.textContent = 'Running…';
 
+  // Catatan revisi: "rpmb" dan "url" TIDAK dikirim lagi ke /predict —
+  // keduanya bukan lagi bagian dari FEATURES_FINAL di pipeline terbaru.
   const payload = {
     site_id: document.getElementById('site_id').value,
     severity: currentSeverity,
@@ -676,13 +671,11 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
     duarasi_alaram: document.getElementById('duarasi_alaram').value,
     payload: document.getElementById('payload').value,
     baseline_payload: document.getElementById('baseline_payload').value,
-    rpmb: document.getElementById('rpmb').value,
     availability_full: document.getElementById('availability_full').value,
     regional: document.getElementById('regional').value,
     day_type: document.getElementById('day_type').value,
     rootcausecategory: document.getElementById('rootcausecategory').value || 'unknown',
     update_impact: document.getElementById('update_impact').value || '1',
-    url: document.getElementById('url').value,
   };
 
   try{
@@ -713,8 +706,8 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
       <div class="breakdown-item"><div class="k">Regional</div><div class="v">${payload.regional}</div></div>
       <div class="breakdown-item"><div class="k">Duration</div><div class="v">${payload.duarasi_alaram}</div></div>
       <div class="breakdown-item"><div class="k">Day type</div><div class="v">${payload.day_type}</div></div>
-      <div class="breakdown-item"><div class="k">Baseline payload</div><div class="v">${payload.baseline_payload} GB</div></div>
-      <div class="breakdown-item"><div class="k">Current payload</div><div class="v">${payload.payload} GB</div></div>
+      <div class="breakdown-item"><div class="k">Baseline payload</div><div class="v">${payload.baseline_payload} MB</div></div>
+      <div class="breakdown-item"><div class="k">Current payload</div><div class="v">${payload.payload} MB</div></div>
     `;
 
     resultCard.classList.add('show');
