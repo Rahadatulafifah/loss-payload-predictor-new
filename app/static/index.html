@@ -647,6 +647,26 @@ document.getElementById('fillFromJsonBtn').addEventListener('click', () => {
   msg.classList.add('success');
 });
 
+// FastAPI mengirim error validasi (422) sebagai `detail` berupa ARRAY
+// of object {loc, msg, type} — bukan string. Kalau ditampilkan langsung
+// jadi "[object Object]". Fungsi ini mengubahnya jadi teks yang bisa
+// dibaca, sekaligus tetap menerima detail berupa string biasa.
+function formatErrorDetail(detail){
+  if(detail == null) return 'Request gagal diproses.';
+  if(typeof detail === 'string') return detail;
+  if(Array.isArray(detail)){
+    return detail.map(item => {
+      if(item && typeof item === 'object'){
+        const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : item.loc;
+        return field ? `${field}: ${item.msg}` : item.msg;
+      }
+      return String(item);
+    }).join('; ');
+  }
+  if(typeof detail === 'object') return JSON.stringify(detail);
+  return String(detail);
+}
+
 document.getElementById('predictForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -687,7 +707,7 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if(!res.ok){
-      throw new Error(data.detail || 'Request gagal diproses.');
+      throw new Error(formatErrorDetail(data.detail));
     }
 
     const value = data.predicted_loss_payload;
