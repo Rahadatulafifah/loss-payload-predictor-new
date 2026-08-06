@@ -6,9 +6,20 @@ pada `pipeline_loss_payload_cells_new.py`, supaya fitur yang dikirim ke model
 saat serving konsisten persis dengan fitur yang dipakai saat training:
 1. Preprocessing dasar (severity -> severity_num, durasi -> menit, dst).
 2. Feature engineering (log1p, durasi_x_severity).
-3. Lookup hourly_baseline dari df_hourly (site_id + hour + day_name).
+3. Lookup hourly_baseline dari df_hourly (site_id + hour + day_name),
+   dikonversi ke MB (avg_payload_gb * 1024) -- SAMA seperti CELL 5B/19.
 4. Encoding kategorikal pakai encoder hasil training, fallback ke "unknown".
 5. Prediksi -> expm1 kalau model dilatih di skala log (is_log_model).
+
+REVISI:
+- "rpmb" (dan "log_rpmb") DIHAPUS TOTAL dari service ini -- sudah tidak
+  ada di FEATURES_FINAL model hasil training terbaru, jadi tidak boleh
+  jadi field wajib di request lagi (menyebabkan error "rpmb: Field
+  required" saat frontend sudah tidak mengirimnya).
+- Lookup hourly_baseline sekarang dikonversi ke MB (dikali 1024), supaya
+  konsisten dengan satuan yang dipelajari model saat training. Sebelumnya
+  kolom avg_payload_gb dipakai mentah-mentah (masih GB) -- bug ini
+  membuat prediksi bisa meleset meski request-nya "berhasil".
 """
 
 import os
@@ -70,12 +81,13 @@ class IncidentInput(BaseModel):
     duarasi_alaram: str
     payload: str
     baseline_payload: str
-    rpmb: str
     availability_full: str
     regional: str
     day_type: Optional[str] = "Weekday"
     rootcausecategory: Optional[str] = "unknown"
     update_impact: Optional[str] = "1"
+    # "url" tetap opsional -- hanya dipakai untuk info impacted_sites_count
+    # (EDA/audit), TIDAK ikut jadi fitur model (bukan bagian FEATURES_FINAL).
     url: Optional[str] = ""
 
     class Config:
@@ -87,7 +99,6 @@ class IncidentInput(BaseModel):
                 "duarasi_alaram": "14:36:59",
                 "payload": "0",
                 "baseline_payload": "9750,617441",
-                "rpmb": "3,259676896",
                 "availability_full": "62,53472222",
                 "regional": "KALIMANTAN",
                 "day_type": "Weekday",
@@ -157,7 +168,6 @@ def predict_from_raw(raw_input: IncidentInput) -> float:
     try:
         row["baseline_payload"] = float(str(raw_input.baseline_payload).replace(",", "."))
         row["payload"] = float(str(raw_input.payload).replace(",", "."))
-        row["rpmb"] = float(str(raw_input.rpmb).replace(",", "."))
         row["availability_full"] = float(str(raw_input.availability_full).replace(",", "."))
         row["update_impact"] = float(raw_input.update_impact)
     except ValueError as e:
@@ -178,21 +188,24 @@ def predict_from_raw(raw_input: IncidentInput) -> float:
     row["is_peak_hour"] = int(8 <= alarm_start.hour <= 22)
 
     day_type_str = raw_input.day_type or "Weekday"
-    row["impacted_sites_count"] = count_impacted_sites(raw_input.url)
+    # Hanya untuk info -- TIDAK dimasukkan ke `row`/fitur model, karena
+    # impacted_sites_count bukan bagian dari FEATURES_FINAL.
+    _impacted_sites_count_info = count_impacted_sites(raw_input.url)
 
     # -- Feature engineering --
     row["log_baseline_payload"] = np.log1p(row["baseline_payload"])
     row["log_payload"] = np.log1p(row["payload"])
-    row["log_rpmb"] = np.log1p(row["rpmb"])
     row["durasi_x_severity"] = row["durasi_menit"] * row["severity_num"]
 
     # -- Lookup hourly_baseline (persis CELL 19: join site_id + hour + day_name) --
+    # avg_payload_gb dikonversi ke MB (1 GB = 1024 MB) supaya SATUANNYA SAMA
+    # dengan yang dipelajari model saat training (lihat CELL 5B/19 pipeline).
     hb_match = df_hourly[
         (df_hourly["site_id"] == raw_input.site_id)
         & (df_hourly["hour"] == row["hour"])
         & (df_hourly["day_name"].str.lower() == day_type_str.lower())
     ]["avg_payload_gb"]
-    row["hourly_baseline"] = float(hb_match.values[0]) if not hb_match.empty else 0.0
+    row["hourly_baseline"] = (float(hb_match.values[0]) * 1024) if not hb_match.empty else 0.0
 
     # -- Encoding kategorikal --
     encode_map = {
