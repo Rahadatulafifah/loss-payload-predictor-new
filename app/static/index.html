@@ -131,6 +131,43 @@
     background: var(--border);
   }
 
+  /* Quick-fill JSON — collapsible disclosure, styled like panel-label but interactive */
+  .quick-fill-toggle{
+    all: unset;
+    box-sizing: border-box;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    font-family: var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    color: var(--text-faint);
+    text-transform:uppercase;
+    margin-bottom: 14px;
+    padding: 4px 2px;
+    border-radius: 4px;
+  }
+  .quick-fill-toggle::after{
+    content:'';
+    height:1px;
+    flex:1;
+    background: var(--border);
+  }
+  .quick-fill-toggle:hover{ color: var(--text-dim); }
+  .quick-fill-toggle:focus-visible{
+    outline: 1px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .quick-fill-toggle .chevron{
+    font-size:9px;
+    transition: transform 0.15s ease;
+    flex-shrink:0;
+  }
+  .quick-fill-toggle[aria-expanded="true"] .chevron{ transform: rotate(180deg); }
+  .quick-fill-body{ margin-bottom: 8px; }
+
   /* Severity segmented control */
   .severity-control{
     display:grid;
@@ -152,6 +189,10 @@
     letter-spacing:0.04em;
     text-transform:uppercase;
     transition: all 0.15s ease;
+  }
+  .sev-btn:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .sev-btn .dot{
     width:7px;height:7px;border-radius:50%;
@@ -191,6 +232,11 @@
     margin-top:5px;
   }
 
+  @media (max-width: 480px){
+    .field-row{ grid-template-columns: 1fr; gap:0; }
+    .severity-control{ grid-template-columns: repeat(2, 1fr); }
+  }
+
   input[type=text], input[type=number], select, textarea{
     width:100%;
     background: var(--panel-raised);
@@ -201,7 +247,7 @@
     font-family: var(--font-mono);
     font-size:13px;
     outline:none;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   textarea{
     resize:vertical;
@@ -211,8 +257,26 @@
   input::placeholder, textarea::placeholder{ color: var(--text-faint); }
   input:focus, select:focus, textarea:focus{
     border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
   }
-  select{ appearance:none; cursor:pointer; }
+
+  /* Custom select — appearance:none needs its own chevron back */
+  .select-wrap{ position:relative; }
+  .select-wrap select{
+    appearance:none;
+    cursor:pointer;
+    padding-right: 32px;
+  }
+  .select-wrap::after{
+    content:'';
+    position:absolute;
+    right:14px; top:50%;
+    width:7px; height:7px;
+    border-right:1.5px solid var(--text-dim);
+    border-bottom:1.5px solid var(--text-dim);
+    transform: translateY(-65%) rotate(45deg);
+    pointer-events:none;
+  }
 
   .json-fill-row{
     display:flex;
@@ -234,6 +298,7 @@
     transition: border-color 0.15s ease, color 0.15s ease;
   }
   .fill-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .fill-btn:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
   .json-fill-msg{
     font-family: var(--font-mono);
     font-size:11px;
@@ -264,7 +329,19 @@
   }
   .run-btn:hover{ filter: brightness(1.08); }
   .run-btn:active{ filter: brightness(0.94); }
-  .run-btn:disabled{ opacity:0.55; cursor:progress; }
+  .run-btn:disabled{ opacity:0.75; cursor:progress; }
+  .run-btn:focus-visible{ outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .btn-spinner{
+    display:none;
+    width:14px; height:14px;
+    border:2px solid rgba(8,17,13,0.35);
+    border-top-color:#08110D;
+    border-radius:50%;
+    animation: spin 0.7s linear infinite;
+  }
+  .run-btn.is-loading .btn-spinner{ display:inline-block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 
   /* Result panel */
   .result-panel{
@@ -300,7 +377,11 @@
   }
 
   .result-card{ display:none; flex:1; flex-direction:column; }
-  .result-card.show{ display:flex; }
+  .result-card.show{ display:flex; animation: resultIn 0.35s ease; }
+  @keyframes resultIn{
+    from{ opacity:0; transform: translateY(6px); }
+    to{ opacity:1; transform:none; }
+  }
 
   .result-headline{
     text-align:center;
@@ -393,6 +474,117 @@
     line-height:1.55;
   }
 
+  /* Mode switch: single insiden vs batch (CSV/Excel) */
+  .mode-switch{
+    display:flex;
+    gap:8px;
+    margin-bottom:24px;
+    padding:4px;
+    background: var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:9px;
+  }
+  .mode-btn{
+    flex:1;
+    padding:9px 10px;
+    border:none;
+    background:transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    border-radius:6px;
+    cursor:pointer;
+    transition: all 0.15s ease;
+  }
+  .mode-btn.active{
+    background: var(--panel);
+    color: var(--text);
+    border:1px solid var(--border);
+  }
+  .mode-btn:focus-visible{ outline: 2px solid var(--accent); outline-offset:2px; }
+
+  /* Batch upload: drop zone */
+  .file-drop{
+    display:block;
+    border:1px dashed var(--border);
+    border-radius:9px;
+    padding:28px 16px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .file-drop:hover, .file-drop.dragover{ border-color: var(--accent); background: rgba(79,209,232,0.04); }
+  .file-drop input[type=file]{
+    position:absolute;
+    width:1px; height:1px;
+    opacity:0; overflow:hidden;
+  }
+  .file-drop .file-drop-label{
+    font-size:12px;
+    color: var(--text-dim);
+  }
+  .file-drop .file-drop-name{
+    margin-top:8px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  /* Batch results: summary strip + table */
+  .batch-summary{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:1px;
+    background: var(--border-soft);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .batch-summary-item{ background: var(--panel); padding:14px; text-align:center; }
+  .batch-summary-item .n{ font-family: var(--font-display); font-size:22px; font-weight:700; }
+  .batch-summary-item .k{ font-size:10px; color: var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; margin-top:4px; }
+
+  .batch-table-wrap{
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:auto;
+    max-height: 420px;
+    flex:1;
+  }
+  .batch-table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .batch-table th{
+    position:sticky; top:0;
+    background: var(--panel-raised);
+    text-align:left;
+    padding:9px 12px;
+    font-family: var(--font-mono);
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color: var(--text-faint);
+    border-bottom:1px solid var(--border);
+  }
+  .batch-table td{
+    padding:8px 12px;
+    border-bottom:1px solid var(--border-soft);
+    font-family: var(--font-mono);
+    color: var(--text);
+  }
+  .batch-table tr.row-error td{ color: var(--sev-critical); }
+  .batch-download-row{ margin-top:14px; display:flex; justify-content:flex-end; }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
   ::-webkit-scrollbar{ width:8px; }
   ::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
 </style>
@@ -420,10 +612,20 @@
 <div class="shell">
 
   <!-- FORM -->
-  <form class="panel" id="predictForm">
+  <div class="panel">
 
-    <div class="panel-label">Quick fill (paste JSON)</div>
-    <div class="field">
+    <div class="mode-switch" role="tablist" aria-label="Mode prediksi">
+      <button type="button" class="mode-btn active" data-mode="single" role="tab" aria-selected="true" id="modeSingleBtn">Single insiden</button>
+      <button type="button" class="mode-btn" data-mode="batch" role="tab" aria-selected="false" id="modeBatchBtn">Batch (CSV/Excel)</button>
+    </div>
+
+    <form id="predictForm">
+
+    <button type="button" class="quick-fill-toggle" id="quickFillToggle" aria-expanded="false" aria-controls="quickFillBody">
+      <span>Quick fill (paste JSON)</span>
+      <span class="chevron" aria-hidden="true">▾</span>
+    </button>
+    <div class="field quick-fill-body" id="quickFillBody" hidden>
       <textarea id="jsonInput" placeholder='{"site_id": "SBS087", "severity": "Low", "alarm_start_time": "2026-04-29 23:57:36", ...}'></textarea>
       <div class="json-fill-row">
         <button type="button" class="fill-btn" id="fillFromJsonBtn">Isi ke form</button>
@@ -431,37 +633,37 @@
       </div>
     </div>
 
-    <div class="panel-label" style="margin-top:28px;">Incident input</div>
+    <div class="panel-label" style="margin-top:8px;">Incident input</div>
 
     <div class="field">
-      <label>Severity</label>
-      <div class="severity-control" id="severityControl">
-        <div class="sev-btn active" data-sev="low"><div class="dot"></div>Low</div>
-        <div class="sev-btn" data-sev="minor"><div class="dot"></div>Minor</div>
-        <div class="sev-btn" data-sev="major"><div class="dot"></div>Major</div>
-        <div class="sev-btn" data-sev="critical"><div class="dot"></div>Critical</div>
+      <label id="severityLabel">Severity</label>
+      <div class="severity-control" id="severityControl" role="radiogroup" aria-labelledby="severityLabel">
+        <div class="sev-btn active" data-sev="low" role="radio" aria-checked="true" tabindex="0"><div class="dot"></div>Low</div>
+        <div class="sev-btn" data-sev="minor" role="radio" aria-checked="false" tabindex="-1"><div class="dot"></div>Minor</div>
+        <div class="sev-btn" data-sev="major" role="radio" aria-checked="false" tabindex="-1"><div class="dot"></div>Major</div>
+        <div class="sev-btn" data-sev="critical" role="radio" aria-checked="false" tabindex="-1"><div class="dot"></div>Critical</div>
       </div>
     </div>
 
     <div class="field-row">
       <div class="field">
-        <label>Site ID</label>
+        <label for="site_id">Site ID</label>
         <input type="text" id="site_id" placeholder="SBS087" required>
       </div>
       <div class="field">
-        <label>Regional</label>
+        <label for="regional">Regional</label>
         <input type="text" id="regional" placeholder="KALIMANTAN" required>
       </div>
     </div>
 
     <div class="field-row">
       <div class="field">
-        <label>Alarm start time</label>
+        <label for="alarm_start_time">Alarm start time</label>
         <input type="text" id="alarm_start_time" placeholder="2026-04-29 23:57:36" required>
         <div class="hint">format YYYY-MM-DD HH:MM:SS atau DD/MM/YYYY HH.MM.SS</div>
       </div>
       <div class="field">
-        <label>Duration</label>
+        <label for="duarasi_alaram">Duration</label>
         <input type="text" id="duarasi_alaram" placeholder="14:36:59" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]" required>
         <div class="hint">format HH:MM:SS</div>
       </div>
@@ -469,44 +671,73 @@
 
     <div class="field-row">
       <div class="field">
-        <label>Payload (MB)</label>
+        <label for="payload">Payload (MB)</label>
         <input type="text" id="payload" placeholder="0" required>
       </div>
       <div class="field">
-        <label>Baseline payload (MB)</label>
+        <label for="baseline_payload">Baseline payload (MB)</label>
         <input type="text" id="baseline_payload" placeholder="9750,617441" required>
       </div>
     </div>
 
     <div class="field-row">
       <div class="field">
-        <label>Availability (%)</label>
+        <label for="availability_full">Availability (%)</label>
         <input type="text" id="availability_full" placeholder="62,53472222" required>
       </div>
       <div class="field">
-        <label>Day type</label>
-        <select id="day_type">
-          <option value="Weekday">Weekday</option>
-          <option value="Weekend">Weekend</option>
+        <label for="day_type">Day type</label>
+        <div class="select-wrap">
+          <select id="day_type">
+            <option value="Weekday">Weekday</option>
+            <option value="Weekend">Weekend</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="rootcausecategory">Root cause category</label>
+      <div class="select-wrap">
+        <select id="rootcausecategory">
+          <option value="">Pilih kategori</option>
+          <option value="Power">Power</option>
+          <option value="Transmisi">Transmisi</option>
+          <option value="Radio">Radio</option>
+          <option value="Aktivitas">Aktivitas</option>
+          <option value="Lain - lain">Lain - lain</option>
+          <option value="Hardware">Hardware</option>
         </select>
       </div>
     </div>
 
-    <div class="field-row">
-      <div class="field">
-        <label>Update impact</label>
-        <input type="text" id="update_impact" value="1">
+    <button type="submit" class="run-btn" id="runBtn">
+      <span class="btn-spinner" aria-hidden="true"></span>
+      <span class="btn-label">Run prediction</span>
+    </button>
+    </form>
+
+    <div id="batchModeSection" hidden>
+      <div class="panel-label" style="margin-top:8px;">Upload file insiden</div>
+
+      <label class="file-drop" id="fileDropArea" for="batchFileInput">
+        <input type="file" id="batchFileInput" accept=".csv,.xlsx,.xls">
+        <div class="file-drop-label">Klik atau seret file CSV/Excel ke sini</div>
+        <div class="file-drop-name" id="fileDropName"></div>
+      </label>
+      <div class="hint" style="margin-top:8px; margin-bottom:18px;">
+        Kolom wajib: site_id, severity, alarm_start_time, duarasi_alaram, payload,
+        baseline_payload, availability_full, regional. Opsional (ada default):
+        day_type, rootcausecategory.
       </div>
-      <div class="field">
-        <label>Root cause category</label>
-        <input type="text" id="rootcausecategory" placeholder="Power">
-      </div>
+
+      <button type="button" class="run-btn" id="runBatchBtn">
+        <span class="btn-spinner" aria-hidden="true"></span>
+        <span class="btn-label">Run batch prediction</span>
+      </button>
     </div>
 
-    <button type="submit" class="run-btn" id="runBtn">
-      Run prediction
-    </button>
-  </form>
+  </div>
 
   <!-- RESULT -->
   <div class="result-panel">
@@ -523,7 +754,7 @@
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
           <path d="M3 12h4l2 8 4-16 2 8h6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p>Isi data insiden di sebelah kiri, lalu jalankan prediksi untuk melihat estimasi loss payload.</p>
+        <p id="emptyStateText">Isi data insiden di sebelah kiri, lalu jalankan prediksi untuk melihat estimasi loss payload.</p>
       </div>
 
       <div class="result-card" id="resultCard">
@@ -534,6 +765,25 @@
         </div>
 
         <div class="breakdown" id="resultBreakdown"></div>
+      </div>
+
+      <div class="result-card" id="batchResultCard">
+        <div class="batch-summary">
+          <div class="batch-summary-item"><div class="n" id="batchTotalN">0</div><div class="k">Total baris</div></div>
+          <div class="batch-summary-item"><div class="n" id="batchSuccessN" style="color:var(--sev-low);">0</div><div class="k">Berhasil</div></div>
+          <div class="batch-summary-item"><div class="n" id="batchErrorN" style="color:var(--sev-critical);">0</div><div class="k">Gagal</div></div>
+        </div>
+        <div class="batch-table-wrap">
+          <table class="batch-table">
+            <thead>
+              <tr><th>Baris</th><th>Site ID</th><th>Predicted loss_payload</th><th>Catatan</th></tr>
+            </thead>
+            <tbody id="batchTableBody"></tbody>
+          </table>
+        </div>
+        <div class="batch-download-row">
+          <button type="button" class="fill-btn" id="downloadBatchBtn">Download hasil (CSV)</button>
+        </div>
       </div>
 
     </div>
@@ -555,15 +805,183 @@ function applyAccent(sev){
   document.documentElement.style.setProperty('--accent', SEV_COLORS[sev]);
 }
 
+function setActiveSeverity(btn){
+  document.querySelectorAll('.sev-btn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-checked', 'false');
+    b.tabIndex = -1;
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-checked', 'true');
+  btn.tabIndex = 0;
+  currentSeverity = btn.dataset.sev;
+  applyAccent(currentSeverity);
+}
+
 document.querySelectorAll('.sev-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentSeverity = btn.dataset.sev;
-    applyAccent(currentSeverity);
+  btn.addEventListener('click', () => setActiveSeverity(btn));
+  btn.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      setActiveSeverity(btn);
+    }
   });
 });
 applyAccent(currentSeverity);
+
+// -- Toggle quick-fill JSON panel --
+const quickFillToggle = document.getElementById('quickFillToggle');
+const quickFillBody = document.getElementById('quickFillBody');
+quickFillToggle.addEventListener('click', () => {
+  const expanded = quickFillToggle.getAttribute('aria-expanded') === 'true';
+  quickFillToggle.setAttribute('aria-expanded', String(!expanded));
+  quickFillBody.hidden = expanded;
+  if(!expanded) document.getElementById('jsonInput').focus();
+});
+
+// -- Mode switch: single insiden vs batch (CSV/Excel) --
+const modeSingleBtn = document.getElementById('modeSingleBtn');
+const modeBatchBtn = document.getElementById('modeBatchBtn');
+const predictFormEl = document.getElementById('predictForm');
+const batchModeSection = document.getElementById('batchModeSection');
+const emptyStateText = document.getElementById('emptyStateText');
+
+const EMPTY_STATE_TEXT = {
+  single: 'Isi data insiden di sebelah kiri, lalu jalankan prediksi untuk melihat estimasi loss payload.',
+  batch: 'Upload file CSV/Excel berisi banyak insiden (misal data sepekan atau sebulan), lalu jalankan batch prediction untuk melihat hasilnya di sini.',
+};
+
+function setMode(mode){
+  const isSingle = mode === 'single';
+  modeSingleBtn.classList.toggle('active', isSingle);
+  modeSingleBtn.setAttribute('aria-selected', String(isSingle));
+  modeBatchBtn.classList.toggle('active', !isSingle);
+  modeBatchBtn.setAttribute('aria-selected', String(!isSingle));
+  predictFormEl.hidden = !isSingle;
+  batchModeSection.hidden = isSingle;
+
+  // Reset panel hasil tiap ganti mode, biar tidak ada hasil mode lain yang nyangkut
+  document.getElementById('resultCard').classList.remove('show');
+  document.getElementById('batchResultCard').classList.remove('show');
+  document.getElementById('errorCard').classList.remove('show');
+  emptyStateText.textContent = EMPTY_STATE_TEXT[mode];
+  document.getElementById('emptyState').style.display = 'flex';
+}
+
+modeSingleBtn.addEventListener('click', () => setMode('single'));
+modeBatchBtn.addEventListener('click', () => setMode('batch'));
+
+// -- Batch: pilih file (klik atau drag & drop) --
+const batchFileInput = document.getElementById('batchFileInput');
+const fileDropArea = document.getElementById('fileDropArea');
+const fileDropName = document.getElementById('fileDropName');
+let selectedBatchFile = null;
+
+function setSelectedBatchFile(file){
+  selectedBatchFile = file || null;
+  fileDropName.textContent = selectedBatchFile ? selectedBatchFile.name : '';
+}
+
+batchFileInput.addEventListener('change', () => {
+  setSelectedBatchFile(batchFileInput.files[0]);
+});
+
+['dragover', 'dragleave', 'drop'].forEach(evt => {
+  fileDropArea.addEventListener(evt, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+});
+fileDropArea.addEventListener('dragover', () => fileDropArea.classList.add('dragover'));
+fileDropArea.addEventListener('dragleave', () => fileDropArea.classList.remove('dragover'));
+fileDropArea.addEventListener('drop', (e) => {
+  fileDropArea.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if(file) setSelectedBatchFile(file);
+});
+
+// -- Batch: jalankan prediksi --
+let lastBatchResults = [];
+
+document.getElementById('runBatchBtn').addEventListener('click', async () => {
+  const runBatchBtn = document.getElementById('runBatchBtn');
+  const runBatchLabel = runBatchBtn.querySelector('.btn-label');
+  const errorCard = document.getElementById('errorCard');
+  const emptyState = document.getElementById('emptyState');
+  const resultCard = document.getElementById('resultCard');
+  const batchResultCard = document.getElementById('batchResultCard');
+
+  if(!selectedBatchFile){
+    document.getElementById('errorMsg').textContent = 'Pilih file CSV/Excel dulu sebelum menjalankan batch prediction.';
+    errorCard.classList.add('show');
+    emptyState.style.display = 'flex';
+    return;
+  }
+
+  errorCard.classList.remove('show');
+  resultCard.classList.remove('show');
+  batchResultCard.classList.remove('show');
+  emptyState.style.display = 'none';
+
+  runBatchBtn.disabled = true;
+  runBatchBtn.classList.add('is-loading');
+  runBatchLabel.textContent = 'Running…';
+
+  try{
+    const formData = new FormData();
+    formData.append('file', selectedBatchFile);
+
+    const res = await fetch('/predict-batch', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if(!res.ok){
+      throw new Error(formatErrorDetail(data.detail));
+    }
+
+    lastBatchResults = data.results;
+
+    document.getElementById('batchTotalN').textContent = data.count.toLocaleString('id-ID');
+    document.getElementById('batchSuccessN').textContent = data.success_count.toLocaleString('id-ID');
+    document.getElementById('batchErrorN').textContent = data.error_count.toLocaleString('id-ID');
+
+    document.getElementById('batchTableBody').innerHTML = data.results.map(r => `
+      <tr class="${r.error ? 'row-error' : ''}">
+        <td>${r.row}</td>
+        <td>${r.site_id ?? '-'}</td>
+        <td>${r.predicted_loss_payload != null ? r.predicted_loss_payload.toLocaleString('id-ID') : '-'}</td>
+        <td>${r.error ?? ''}</td>
+      </tr>
+    `).join('');
+
+    batchResultCard.classList.add('show');
+  }catch(err){
+    document.getElementById('errorMsg').textContent = err.message;
+    errorCard.classList.add('show');
+    emptyState.style.display = 'flex';
+  }finally{
+    runBatchBtn.disabled = false;
+    runBatchBtn.classList.remove('is-loading');
+    runBatchLabel.textContent = 'Run batch prediction';
+  }
+});
+
+// -- Batch: download hasil sebagai CSV --
+document.getElementById('downloadBatchBtn').addEventListener('click', () => {
+  if(!lastBatchResults.length) return;
+  const esc = (v) => v == null ? '' : String(v).replace(/"/g, '""');
+  const header = 'row,site_id,predicted_loss_payload,error';
+  const lines = lastBatchResults.map(r =>
+    [r.row, esc(r.site_id), r.predicted_loss_payload ?? '', `"${esc(r.error)}"`].join(',')
+  );
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hasil_prediksi_batch.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 async function checkHealth(){
   const dot = document.getElementById('apiStatusDot');
@@ -584,14 +1002,14 @@ async function checkHealth(){
 checkHealth();
 
 // -- Quick fill dari JSON --
-// Catatan revisi: "rpmb" dan "url" DIHAPUS dari daftar field yang diisi
-// otomatis, karena keduanya sudah tidak dipakai sebagai fitur model di
-// pipeline terbaru (rpmb dihapus total, url hanya dipakai untuk audit
-// impacted_sites_count di notebook, bukan input /predict).
+// Catatan: "rootcausecategory" & "day_type" ditangani terpisah di bawah
+// (bukan lewat TEXT_FIELD_IDS) karena keduanya sekarang <select>, perlu
+// dicocokkan ke salah satu <option> yang ada, case-insensitive.
+// "rpmb" dan "url" tetap tidak diisi -- sudah bukan bagian dari
+// FEATURES_FINAL di pipeline terbaru.
 const TEXT_FIELD_IDS = [
   'site_id', 'alarm_start_time', 'duarasi_alaram', 'payload',
   'baseline_payload', 'availability_full', 'regional',
-  'rootcausecategory', 'update_impact',
 ];
 
 function sanitizeJsonInput(raw){
@@ -604,6 +1022,14 @@ function sanitizeJsonInput(raw){
   // buang trailing comma sebelum '}' atau ']' (valid di Python dict, tidak valid di JSON.parse)
   inner = inner.replace(/,(\s*[}\]])/g, '$1');
   return inner;
+}
+
+function fillSelectCaseInsensitive(selectEl, rawValue){
+  if(rawValue === undefined || rawValue === null) return;
+  const match = [...selectEl.options].find(
+    o => o.value.toLowerCase() === String(rawValue).toLowerCase()
+  );
+  if(match) selectEl.value = match.value;
 }
 
 document.getElementById('fillFromJsonBtn').addEventListener('click', () => {
@@ -629,19 +1055,11 @@ document.getElementById('fillFromJsonBtn').addEventListener('click', () => {
   if(data.severity){
     const sevKey = String(data.severity).toLowerCase();
     const btn = document.querySelector(`.sev-btn[data-sev="${sevKey}"]`);
-    if(btn){
-      document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentSeverity = sevKey;
-      applyAccent(currentSeverity);
-    }
+    if(btn) setActiveSeverity(btn);
   }
 
-  if(data.day_type){
-    const select = document.getElementById('day_type');
-    const match = [...select.options].find(o => o.value.toLowerCase() === String(data.day_type).toLowerCase());
-    if(match) select.value = match.value;
-  }
+  fillSelectCaseInsensitive(document.getElementById('day_type'), data.day_type);
+  fillSelectCaseInsensitive(document.getElementById('rootcausecategory'), data.rootcausecategory);
 
   msg.textContent = 'Form terisi dari JSON.';
   msg.classList.add('success');
@@ -671,6 +1089,7 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const runBtn = document.getElementById('runBtn');
+  const runBtnLabel = runBtn.querySelector('.btn-label');
   const errorCard = document.getElementById('errorCard');
   const emptyState = document.getElementById('emptyState');
   const resultCard = document.getElementById('resultCard');
@@ -680,10 +1099,13 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
   emptyState.style.display = 'none';
 
   runBtn.disabled = true;
-  runBtn.textContent = 'Running…';
+  runBtn.classList.add('is-loading');
+  runBtnLabel.textContent = 'Running…';
 
-  // Catatan revisi: "rpmb" dan "url" TIDAK dikirim lagi ke /predict —
-  // keduanya bukan lagi bagian dari FEATURES_FINAL di pipeline terbaru.
+  // Catatan: "rpmb", "url", dan "update_impact" TIDAK dikirim lagi ke
+  // /predict — ketiganya bukan lagi bagian dari FEATURES_FINAL di
+  // pipeline terbaru (update_impact didrop karena importance-nya
+  // paling rendah, di luar top-10, dan tidak ada di data baru).
   const payload = {
     site_id: document.getElementById('site_id').value,
     severity: currentSeverity,
@@ -695,7 +1117,6 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
     regional: document.getElementById('regional').value,
     day_type: document.getElementById('day_type').value,
     rootcausecategory: document.getElementById('rootcausecategory').value || 'unknown',
-    update_impact: document.getElementById('update_impact').value || '1',
   };
 
   try{
@@ -737,7 +1158,8 @@ document.getElementById('predictForm').addEventListener('submit', async (e) => {
     emptyState.style.display = 'flex';
   }finally{
     runBtn.disabled = false;
-    runBtn.textContent = 'Run prediction';
+    runBtn.classList.remove('is-loading');
+    runBtnLabel.textContent = 'Run prediction';
   }
 });
 </script>
