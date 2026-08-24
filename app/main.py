@@ -198,13 +198,35 @@ def duration_to_minutes(value):
 
 
 def parse_alarm_start_time(value: str):
-    """Parse alarm_start_time. Prioritas ke format asli sistem monitoring/tiketing
-    (DD/MM/YYYY HH.MM.SS), dengan fallback ke parser umum pandas (dayfirst=True)
-    untuk jaga-jaga kalau ada variasi format lain (mis. ISO)."""
-    parsed = pd.to_datetime(value, format="%d/%m/%Y %H.%M.%S", errors="coerce")
-    if pd.notna(parsed):
-        return parsed
-    return pd.to_datetime(value, errors="coerce", dayfirst=True)
+    """Parse alarm_start_time secara fleksibel. Sumber data mentah bisa
+    beda-beda: tahun 2 digit ('26') atau 4 digit ('2026'), ada detik atau
+    tidak ('23.57' vs '23.57.30'), pemisah jam titik atau titik dua.
+    Titik pada bagian JAM (setelah spasi) dinormalisasi dulu jadi titik
+    dua, lalu dicoba beberapa format eksplisit dari yang paling umum,
+    baru fallback ke parser umum pandas kalau semuanya gagal."""
+    raw = str(value).strip()
+
+    if " " in raw:
+        date_part, time_part = raw.split(" ", 1)
+        normalized = f"{date_part} {time_part.replace('.', ':')}"
+    else:
+        normalized = raw
+
+    candidate_formats = [
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%y %H:%M:%S",
+        "%d/%m/%y %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+    ]
+    for fmt in candidate_formats:
+        parsed = pd.to_datetime(normalized, format=fmt, errors="coerce")
+        if pd.notna(parsed):
+            return parsed
+
+    # Fallback terakhir: parser umum, dayfirst=True supaya '05/04/26' dibaca 5 April, bukan Mei 4
+    return pd.to_datetime(normalized, errors="coerce", dayfirst=True)
 
 
 def encode_category(col: str, value: str) -> int:
