@@ -184,8 +184,14 @@ class BatchResult(BaseModel):
 # Helper functions
 # --------------------------------------------------------------------------
 def duration_to_minutes(value):
+    """Konversi durasi 'HH:MM:SS' -> menit. Mendukung titik dua (:) MAUPUN
+    titik (.) sebagai pemisah -- beberapa sumber data mentah (mis. export
+    langsung dari sistem monitoring) memakai format 'HH.MM.SS', bukan
+    'HH:MM:SS'. Titik dinormalisasi jadi titik dua dulu sebelum di-split,
+    jadi '14.36.59' dan '14:36:59' menghasilkan angka yang sama."""
     try:
-        h, m, s = str(value).strip().split(":")
+        cleaned = str(value).strip().replace(".", ":")
+        h, m, s = cleaned.split(":")
         return int(h) * 60 + int(m) + float(s) / 60
     except Exception:
         return np.nan
@@ -233,6 +239,11 @@ def compute_prediction(raw: dict) -> float:
     row["severity_num"] = sev_map[severity_key]
 
     row["durasi_menit"] = duration_to_minutes(raw.get("duarasi_alaram"))
+    if pd.isna(row["durasi_menit"]):
+        raise ValueError(
+            f"duarasi_alaram '{raw.get('duarasi_alaram')}' tidak bisa diparse. "
+            f"Format yang didukung: 'HH:MM:SS' atau 'HH.MM.SS' (contoh: '14:36:59' atau '14.36.59')."
+        )
 
     try:
         row["baseline_payload"] = float(str(raw.get("baseline_payload")).replace(",", "."))
