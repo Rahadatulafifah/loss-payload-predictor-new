@@ -21,6 +21,7 @@ Target ditransformasi dengan log1p sebelum training untuk menangani distribusi y
 Model_Prediksi_New/
   inap_ticketing_incident_loss_payload_2026.xlsx   Dataset utama (insiden)
   baseline_payload_hourly_weekly.csv               Dataset baseline traffic per jam/hari/site
+  baseline_payload_hourly_weekly_tambahan.csv      Data tambahan baseline hourly (digabung dengan file di atas)
   loss_payload_predictor_new_fixed.ipynb           Notebook utama (versi cell, 2 sumber data)
   requirements.txt                                 Daftar library
   README.md                                        Dokumen ini
@@ -31,7 +32,7 @@ Model_Prediksi_New/
   app/
     main.py                                         API server (FastAPI) + serve UI
     static/
-      index.html                                    Halaman web (form input + hasil prediksi)
+      index.html                                    Halaman web (form input manual + batch upload + hasil prediksi)
   output_ml_new/                                    Output (dibuat otomatis saat notebook dijalankan)
     best_incident_model.joblib                       Satu file berisi model + encoders + features + sev_map + is_log_model
     metrics_summary.csv                              Ringkasan metrik
@@ -76,16 +77,17 @@ pip install -r requirements.txt
 Catatan: sel hyperparameter tuning (RandomizedSearchCV) adalah bagian paling lama, bisa beberapa menit tergantung spesifikasi laptop.
 ## Prediksi Data Baru (dari Notebook)
 
-Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi variabel `raw_input` dengan data insiden baru lalu jalankan selnya. Field yang dibutuhkan: `site_id`, `severity`, `alarm_start_time`, `duarasi_alaram`, `payload`, `baseline_payload`, `rpmb`, `availability_full`, `regional`, `day_type`, `rootcausecategory`, `update_impact`, `url`.
+Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi variabel `raw_input` dengan data insiden baru lalu jalankan selnya. Field yang dibutuhkan: `site_id`, `severity`, `alarm_start_time`, `duarasi_alaram`, `payload`, `baseline_payload`, `availability_full`, `regional`, `day_type`, `rootcausecategory`, `url`.
 
 ## Catatan Teknis Penting
 
 - Angka desimal pada dataset memakai koma sebagai pemisah (mis. `"9750,617441"`). Fungsi `to_numeric_safe` (notebook) dan konversi `.replace(",", ".")` (API) menanganinya otomatis.
 - Format tanggal `alarm_start_time` yang didukung API ada dua: format asli sistem monitoring `DD/MM/YYYY HH.MM.SS` (mis. `29/04/2026 23.53.30`) sebagai prioritas utama, dengan fallback ke format ISO `YYYY-MM-DD HH:MM:SS`.
+- Format durasi `duarasi_alaram` mendukung titik dua ATAUPUN titik sebagai pemisah jam-menit-detik (`"14:36:59"` maupun `"14.36.59"` sama-sama valid, dinormalisasi otomatis) — beberapa sumber data mentah (mis. export langsung dari sistem monitoring) memakai format titik, bukan titik dua.
 - Target `loss_payload` ditraining dengan transformasi log1p untuk menangani distribusi yang sangat skewed. Hasil prediksi otomatis dikembalikan ke skala asli dengan expm1, dikontrol oleh flag `is_log_model` di dalam artifact model — bukan diasumsikan tetap seperti versi sebelumnya.
 - Outlier pada target tidak dipotong. Nilai loss yang sangat besar adalah insiden nyata, bukan error pencatatan.
 - `loss_payload` dan `baseline_payload` selalu kosong bersamaan pada sebagian baris. Baris tanpa target dibuang karena tidak bisa dipakai untuk training.
-- Data baseline hourly (`baseline_payload_hourly_weekly.csv`) digabung ke data insiden lewat left join berdasarkan `site_id` + `hour` + nama hari (`day_name`), menghasilkan fitur `hourly_baseline`. Baris insiden yang site/jam/harinya tidak ada di data hourly tetap dipakai, dengan `hourly_baseline` diisi 0.
+- Data baseline hourly digabung dari **dua file** (`baseline_payload_hourly_weekly.csv` + `baseline_payload_hourly_weekly_tambahan.csv`) sebelum dipakai. Kalau ada kombinasi `site_id` + `hour` + `day_name` yang muncul di kedua file, diagregasi (dirata-rata) dulu supaya tetap satu baris per kombinasi — mencegah satu insiden ke-match ke lebih dari satu baris baseline saat join. Hasil gabungan ini digabung ke data insiden lewat left join berdasarkan `site_id` + `hour` + nama hari (`day_name`), menghasilkan fitur `hourly_baseline`. Baris insiden yang site/jam/harinya tidak ada di data hourly tetap dipakai, dengan `hourly_baseline` diisi 0.
 
 ## Kolom yang Tidak Dipakai Langsung dan Alasannya
 
@@ -96,9 +98,11 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 | alarm_clear_time | Redundan dengan durasi |
 | duarasi_alaram (mentah) | Sudah dikonversi menjadi `durasi_menit` |
 | rootcausedetail | Sudah diwakili `rootcausecategory` |
-| url (mentah) | Sudah diekstrak menjadi `impacted_sites_count` |
+| url (mentah) | Sudah diekstrak menjadi `impacted_sites_count` (dipakai untuk EDA/audit, bukan fitur model) |
+| rpmb | Dihapus dari pipeline — korelasi ke target sangat lemah, tidak esensial |
+| update_impact | Didrop dari `FEATURES_FINAL` — importance-nya paling rendah di feature importance (di luar top-10), dan tidak tersedia di sumber data baru |
 
-## Fitur yang Digunakan Model (19 fitur)
+## Fitur yang Digunakan Model (16 fitur)
 
 | Fitur | Sumber | Keterangan |
 |---|---|---|
@@ -106,10 +110,7 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 | durasi_menit | Diturunkan | Konversi dari HH:MM:SS |
 | baseline_payload | Dataset | Traffic normal site, prediktor terkuat |
 | payload | Dataset | Traffic aktual saat insiden |
-| rpmb | Dataset | Request Per Minute Baseline |
 | availability_full | Dataset | Persentase availability |
-| update_impact | Dataset | Numerik langsung |
-| impacted_sites_count | Diturunkan | Jumlah site dari kolom `url` |
 | hour | Diturunkan | Jam mulai alarm |
 | month | Diturunkan | Bulan mulai alarm |
 | is_peak_hour | Dibuat | 1 jika jam 08.00–22.00 |
@@ -118,9 +119,8 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 | rootcausecategory | Dataset | Label encoded |
 | log_baseline_payload | Dibuat | log1p(baseline_payload) |
 | log_payload | Dibuat | log1p(payload) |
-| log_rpmb | Dibuat | log1p(rpmb) |
 | durasi_x_severity | Dibuat | Interaksi durasi dan keparahan |
-| **hourly_baseline** | **Digabung dari file kedua** | **Rata-rata payload historis di jam & hari yang sama (hasil join dengan `baseline_payload_hourly_weekly.csv`)** |
+| **hourly_baseline** | **Digabung dari file kedua** | **Rata-rata payload historis di jam & hari yang sama (hasil join dengan data baseline hourly gabungan)** |
 
 ## Metrik Evaluasi
 
@@ -132,7 +132,7 @@ Setelah notebook dijalankan penuh, buka cell contoh inference (CELL 19). Isi var
 
 ## Deployment API
 
-Model dijalankan sebagai API menggunakan FastAPI, lengkap dengan halaman web sederhana untuk input manual (tidak cuma lewat `/docs`). Pastikan file `output_ml_new/best_incident_model.joblib` dan `baseline_payload_hourly_weekly.csv` sudah tersedia di lokasi yang sesuai sebelum menjalankan API (lihat struktur folder di atas).
+Model dijalankan sebagai API menggunakan FastAPI, lengkap dengan halaman web sederhana untuk input manual maupun batch (tidak cuma lewat `/docs`). Pastikan file `output_ml_new/best_incident_model.joblib`, `baseline_payload_hourly_weekly.csv`, dan `baseline_payload_hourly_weekly_tambahan.csv` sudah tersedia di lokasi yang sesuai sebelum menjalankan API (lihat struktur folder di atas).
 
 ### Menjalankan API Tanpa Docker
 
@@ -159,18 +159,16 @@ docker build -t loss-payload-api .
 3. Jalankan container:
 
 ```
-docker run -p 8000:8000 loss-payload-api
+docker run -d -p 8000:8000 --restart unless-stopped loss-payload-api
 ```
 
-API dan UI berjalan di http://localhost:8000, sama seperti tanpa Docker.
+API dan UI berjalan di http://localhost:8000, sama seperti tanpa Docker. (`-d` menjalankan di background, `--restart unless-stopped` membuatnya otomatis nyala lagi kalau server reboot atau container crash.)
 
 Atau, pakai docker compose supaya build+run jadi satu perintah:
 
 ```
-docker compose up --build
+docker compose up --build -d
 ```
-
-Tekan `Ctrl+C` untuk menghentikan.
 
 ### Memindahkan ke Server Perusahaan
 
@@ -186,19 +184,26 @@ docker save -o loss-payload-api.tar loss-payload-api
 
 ```
 docker load -i loss-payload-api.tar
-docker run -p 8000:8000 loss-payload-api
+docker run -d -p 8000:8000 --restart unless-stopped loss-payload-api
 ```
 
 API langsung berjalan tanpa perlu install apapun di server.
 
 ### Menggunakan Halaman UI
 
-Buka http://localhost:8000, ada dua cara mengisi data insiden:
+Buka http://localhost:8000. Ada dua **mode** (tab switcher di atas form):
 
-1. **Isi manual** — isi tiap field satu per satu, pilih severity lewat tombol berwarna, pilih day type lewat dropdown.
-2. **Quick fill dari JSON** — tempel JSON data insiden (format sama seperti contoh di bawah, termasuk trailing comma dari copy-paste kode Python) ke kotak di bagian atas, klik **Isi ke form**, semua field otomatis terisi dan siap direview sebelum submit.
+**Mode Single insiden** — cocok untuk cek satu insiden:
+1. **Isi manual** — isi tiap field satu per satu, pilih severity lewat tombol berwarna, pilih day type dan root cause category lewat dropdown.
+2. **Quick fill dari JSON** — tempel JSON data insiden ke kotak yang bisa dibuka di bagian atas, klik **Isi ke form**, semua field otomatis terisi dan siap direview sebelum submit.
 
 Klik **Run prediction** untuk menjalankan prediksi. Hasilnya tampil di panel kanan dengan warna sesuai severity yang dipilih.
+
+**Mode Batch (CSV/Excel)** — untuk cek banyak insiden sekaligus, misal data sepekan atau sebulan:
+1. Klik tab **Batch (CSV/Excel)**.
+2. Klik atau seret file CSV/Excel ke area upload. Kolom wajib: `site_id`, `severity`, `alarm_start_time`, `duarasi_alaram`, `payload`, `baseline_payload`, `availability_full`, `regional`. Kolom `day_type` dan `rootcausecategory` opsional (ada default kalau kosong).
+3. Klik **Run batch prediction**. Hasilnya tampil sebagai ringkasan (total/berhasil/gagal) dan tabel per baris — satu baris yang gagal diproses tidak menggagalkan baris lainnya, errornya tercatat di kolom Catatan.
+4. Klik **Download hasil (CSV)** untuk mengunduh seluruh hasil.
 
 ### Contoh Request Prediksi (via `/predict` atau Swagger)
 
@@ -212,13 +217,10 @@ Kirim POST request ke `/predict` dengan body JSON berikut:
   "duarasi_alaram": "14:36:59",
   "payload": "0",
   "baseline_payload": "9750,617441",
-  "rpmb": "3,259676896",
   "availability_full": "62,53472222",
   "regional": "KALIMANTAN",
   "day_type": "Weekday",
-  "rootcausecategory": "Power",
-  "update_impact": "1",
-  "url": "SBS087"
+  "rootcausecategory": "Power"
 }
 ```
 
@@ -230,6 +232,22 @@ Response:
 }
 ```
 
+### Contoh Request Batch (via `/predict-batch`)
+
+Kirim POST request `multipart/form-data` ke `/predict-batch` dengan field `file` berisi file CSV/Excel (kolom sama seperti contoh di atas, banyak baris). Response:
+
+```json
+{
+  "count": 150,
+  "success_count": 147,
+  "error_count": 3,
+  "results": [
+    {"row": 1, "site_id": "SBS087", "predicted_loss_payload": 994.25, "error": null},
+    {"row": 2, "site_id": "KSN001", "predicted_loss_payload": null, "error": "severity 'unknown' tidak dikenal. Pilihan valid: [...]"}
+  ]
+}
+```
+
 ### Environment Variable (Opsional)
 
 Path artifact model dan data hourly bisa dioverride tanpa ubah kode, lewat environment variable saat `docker run` atau `uvicorn`:
@@ -237,13 +255,15 @@ Path artifact model dan data hourly bisa dioverride tanpa ubah kode, lewat envir
 | Variable | Default | Keterangan |
 |---|---|---|
 | `MODEL_PATH` | `output_ml_new/best_incident_model.joblib` | Lokasi file artifact model |
-| `HOURLY_DATA_PATH` | `baseline_payload_hourly_weekly.csv` | Lokasi file data baseline hourly |
+| `HOURLY_DATA_PATH` | `baseline_payload_hourly_weekly.csv` | Lokasi file data baseline hourly (lama) |
+| `HOURLY_DATA_PATH_TAMBAHAN` | `baseline_payload_hourly_weekly_tambahan.csv` | Lokasi file data baseline hourly tambahan. Kosongkan/hapus variable ini kalau memang cuma ada satu file hourly |
 
 Contoh:
 
 ```
-docker run -p 8000:8000 \
+docker run -d -p 8000:8000 --restart unless-stopped \
   -e MODEL_PATH=/app/output_ml_new/best_incident_model.joblib \
   -e HOURLY_DATA_PATH=/app/baseline_payload_hourly_weekly.csv \
+  -e HOURLY_DATA_PATH_TAMBAHAN=/app/baseline_payload_hourly_weekly_tambahan.csv \
   loss-payload-api
 ```
